@@ -8,7 +8,8 @@ export interface IEvent{
     category: string; // e.g., Concert, Theater, Sports
     description: string;
     date: Date;
-    time: string; // e.g., "19:30"
+    time: string; // e.g., "19:30" 
+    //TODO : Add endDate and endTime for multi-day events AND START DATE AND START TIME for recurring events
     venueId: mongoose.Types.ObjectId;
     city: string;
     isSoldOut: boolean;
@@ -30,5 +31,6 @@ const eventSchema = new Schema<IEvent>({
 })
 
 eventSchema.index({ title: 'text', category: 'text', city: 'text' });
+eventSchema.index({ city: 1 }, { partialFilterExpression: { isSoldOut: false } }); // This keeps the index small and extremely fast because it ignores all the "Sold Out" events that people rarely search for.
 
 export const Event = mongoose.model<IEvent>("Event",eventSchema);

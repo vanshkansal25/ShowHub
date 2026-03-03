@@ -14,9 +14,6 @@ export interface IMovie{
     posterUrl: string;
     isDeleted?: boolean; // For Soft Delete 
 }
-
-
-
 const movieSchema = new Schema<IMovie>({
     title: { type: String, required: true,index:true },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
