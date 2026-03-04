@@ -9,6 +9,7 @@ import { RegisterSchema } from "../schemas/user.Schema";
 
 
 
+
 export const generateAccessToken = (user: UserDocument) => {
   const payload = {
     id: user._id,
@@ -109,5 +110,49 @@ export const logoutUser = asyncHandler(async(req:Request,res:Response)=>{
     
 })
 // Reset Password Logic
+export const resetPassword = asyncHandler(async(req:Request,res:Response)=>{
+    const {newPassword,oldPassword} = req.body;
+    const userId = req.user?.id;
+    if(!userId){
+        throw new ApiError(401,"Unauthorized");
+    }
+    const user = await User.findById(userId).select("+password");
+    if(!user){
+        throw new ApiError(404,"User not found");
+    }
+    const isOldPasswordValid = await user.isPasswordCorrect(oldPassword);
+    if(!isOldPasswordValid){
+        throw new ApiError(401,"Old password is incorrect");
+    }
+    user.password = newPassword;
+    await user.save({validateBeforeSave:false});// to skip validation as we are not providing all fields
+    return res.status(200).json(new ApiResponse(200,{},"Password reset successfully"));
+})
 // Generate refresh token Logic
+export const refreshToken = asyncHandler(async(req:Request,res:Response)=>{
+    const refreshToken = req.cookies.refreshToken;
+    if(!refreshToken){
+        throw new ApiError(401,"Refresh token not found, please login again");
+    }
+    try{
+        const decoded = jwt.verify(refreshToken,process.env.REFRESH_TOKEN_SECRET!) as any;
+        const user = await User.findById(decoded.id);
+        if(!user || user.refreshToken !== refreshToken){
+            throw new ApiError(401,"Invalid refresh token, please login again");
+        }
+        const options = {
+            httpOnly:true,
+            secure:process.env.NODE_ENV === "production",
+        }
+        const newAccessToken = generateAccessToken(user);
+        const newRefreshToken = generateRefreshToken(user);
+        user.refreshToken = newRefreshToken;
+        user.save({validateBeforeSave:false});
+        res.cookie("accessToken",newAccessToken,options);
+        res.cookie("refreshToken",newRefreshToken,options);
+        return res.status(200).json(new ApiResponse(200,{},"Tokens refreshed successfully"));
+    }catch(error){
+        throw new ApiError(401,"Invalid refresh token, please login again");
+    }
+})
 // Get User Profile Logic
