@@ -61,8 +61,53 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
 });
 // Login Logic
 
+export const loginUser = asyncHandler(async(req:Request,res:Response)=>{
+    const {email,password} = req.body;
+    if(!email || !password){
+        throw new ApiError(400,"Email and password are required");
+    }
+    const user = await User.findOne({email}).select("+password");
+    if(!user){
+        throw new ApiError(401,"Invalid email or password");
+    }
+    const isPasswordValid = await user.isPasswordCorrect(password);
+    if(!isPasswordValid){
+        throw new ApiError(401,"Invalid email or password");
+    }
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+    user.refreshToken = refreshToken;
+    await user.save();
+    res.cookie("accessToken",accessToken,{
+        httpOnly:true,
+        secure:process.env.NODE_ENV === "production",
+    })
+    res.cookie("refreshToken",refreshToken,{
+        httpOnly:true,
+        secure:process.env.NODE_ENV === "production",
+    })
+    return res.status(200).json(new ApiResponse(200,{user,accessToken,refreshToken},"User logged in successfully"));
+});
 
 // Logout Logic
+
+export const logoutUser = asyncHandler(async(req:Request,res:Response)=>{
+    const userId = req.user?.id;
+    if(!userId){
+        throw new ApiError(401,"Unauthorized");
+    }
+    await User.findByIdAndUpdate(userId,{
+        $unset:{refreshToken:""}
+    })
+    const options = {
+        httpOnly:true,
+        secure:process.env.NODE_ENV === "production",
+    } 
+    res.clearCookie("accessToken",options);
+    res.clearCookie("refreshToken",options);
+    return res.status(200).json(new ApiResponse(200,{},"User logged out successfully"));
+    
+})
 // Reset Password Logic
 // Generate refresh token Logic
 // Get User Profile Logic
