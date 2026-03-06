@@ -3,6 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import "dotenv/config";
 import connectDB from "./config/db";
+import userRouter from "./routes/user.routes";
 
 const app: Application = express();
 
@@ -26,6 +27,7 @@ app.get("/api/v1/health", (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
   });
 });
+app.use("/api/v1/auth",userRouter)
 
 connectDB()
   .then(() => {
