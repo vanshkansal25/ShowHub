@@ -83,6 +83,50 @@ export const deleteMovie = asyncHandler(async(req:Request,res:Response,next:Next
 // User Facing Functions
 
 //getAllMovies
+export const getAllMovies = asyncHandler(async(req:Request,res:Response,next:NextFunction)=>{
+    const {page = 1 , limit = 10 , genre , language , search,upcoming = "false"} = req.query;
+    // building the filter object 
+    const filter :any = {isDeleted:false}
+    if(genre){
+        filter.genre = {$in:[genre]};
+    }
+    if(language){
+        filter.language = {$in:[language]};
+    }
+    if(search){
+        filter.$text = {$search:search} // MongoDB will return documents where searchedValue appears in indexed text fields.
+    }
+    if(upcoming === "true"){
+        filter.releaseDate = {$gt:new Date()};
+    }
+
+    // pagination based query 
+    const skip = (Number(page)-1)*Number(limit);
+
+    // because of pagination i require two thing movies,totalMovies so instead of running two db queries I will use promises to run this task simultaneously 
+    const [movies,totalMovies] = await Promise.all([
+        Movie.find(filter).sort(search ? { score: { $meta: "textScore" } } : "-releaseDate").skip(skip).limit(Number(limit)).select("title slug posterUrl genre language releaseDate"),
+        Movie.countDocuments(filter)
+    ])
+
+    // total pages 
+
+    const totalPages = Math.ceil(totalMovies/Number(limit));
+    return res.status(200).json(
+        new ApiResponse(200, {
+            movies,
+            // pagination metadata for frontend
+            pagination: {
+                totalMovies,
+                totalPages,
+                currentPage: Number(page),
+                hasNextPage: Number(page) < totalPages
+            }
+        }, "Movies fetched successfully")
+    );
+    //TODO: ADD REDIS IMPLEMENTATION
+})
+//getMoviesByCity
 //getMovieBySlug
 //searchMovies
 //getComingSoon
