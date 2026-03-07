@@ -285,17 +285,64 @@ export const getMovieBySlug = asyncHandler(
             );
     }
 );
+
 //searchMovies
 export const searchMovies = asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
-        
-     },
+        const { q } = req.query;
+        if (!q || typeof q !== "string") {
+            throw new ApiError(400, "Search query is required");
+        }
+        // 1. Perform Text Search
+        const movies = await Movie.find({
+            $text: { $search: q },
+            isDeleted: false,
+        },
+        { score: { $meta: "textScore" } } // Get relevance score
+        ).sort({ score: { $meta: "textScore" } }) // Sort by relevance
+        .limit(10) // Limit results for performance
+        .select("title slug posterUrl genre language rating"); // Select only necessary fields
+
+        // 2. Handle No Results
+        if(movies.length === 0) {
+            return res.status(200).json(new ApiResponse(200, [], "No movies found matching your search"));
+        }
+        return res.status(200).json(
+            new ApiResponse(200, movies, `Found ${movies.length} movies`)
+        );
+    }
 );
+
 //getComingSoon
 export const getComingSoon = asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => { },
+    async (req: Request, res: Response, next: NextFunction) => {
+        // 1. Define the "Now" timestamp
+        const now = new Date();
+
+        // 2. Fetch movies with a future release date
+        // We sort by 'releaseDate' ascending (1) so the nearest ones come first
+        const movies = await Movie.find({
+            releaseDate: { $gt: now },
+            isDeleted: false
+        })
+        .sort({ releaseDate: 1 }) 
+        .select("title slug posterUrl genre language releaseDate rating")
+        .limit(20); // Limit to top 20 upcoming titles
+
+        // 3. Handle Empty State
+        if (!movies || movies.length === 0) {
+            return res.status(200).json(
+                new ApiResponse(200, [], "No upcoming movies at the moment")
+            );
+        }
+
+        return res.status(200).json(
+            new ApiResponse(200, movies, "Upcoming movies fetched successfully")
+        );
+    }
 );
+
 //getNowShowing
 export const getNowShowing = asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => { },
+    async (req: Request, res: Response, next: NextFunction) => { }
 );
