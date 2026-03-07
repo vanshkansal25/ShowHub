@@ -343,6 +343,66 @@ export const getComingSoon = asyncHandler(
 );
 
 //getNowShowing
+
+// edge case here - A movie might have been released two weeks ago, but if no theater in the user's city has a scheduled Show for it today, it should not appear in the "Now Showing" section. Therefore, this controller must look at the Show collection, not just the Movie collection.
 export const getNowShowing = asyncHandler(
-    async (req: Request, res: Response, next: NextFunction) => { }
+    async (req: Request, res: Response, next: NextFunction) => { 
+        const { city } = req.query;
+        const pipeline:any[] = [
+            {
+                $match:{
+                    status: "Active",
+                    startTime: { $gt: new Date() }
+                }
+            }
+        ]
+        // 2. If city is provided, we must join Venue to filter by city
+        if(city && typeof city === "string"){
+            pipeline.push(
+                {
+                    $lookup:{
+                        from:"venues",
+                        localField:"venueId",
+                        foreignField:"_id",
+                        as:"venueDetails"
+                    }
+                },{
+                    $unwind:"$venueDetails"
+                },{
+                    $match: { "venue.city": { $regex: new RegExp(city as string, "i") } }
+                }
+            )
+        }
+        // 3. Group by Movie ID to get a unique list of movies currently in theaters
+        pipeline.push({
+            $group:{
+                _id:"$movieId"
+            }
+        },
+        // 4. Join with Movie collection to get details
+        {
+            $lookup:{
+                from:"movies",
+                localField:"_id",
+                foreignField:"_id",
+                as:"movieDetails"
+            }
+        },{
+            $unwind:"$movieDetails"
+        },{
+            $project: {
+                _id: 1,
+                title: "$movieDetails.title",
+                slug: "$movieDetails.slug",
+                posterUrl: "$movieDetails.posterUrl",
+                genre: "$movieDetails.genre",
+                rating: "$movieDetails.rating",
+                language: "$movieDetails.language"
+            }
+        })
+        const movies = await Show.aggregate(pipeline);
+        return res.status(200).json(
+            new ApiResponse(200, movies, "Now showing movies fetched successfully")
+        );
+    }
 );

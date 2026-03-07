@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import "dotenv/config";
 import connectDB from "./config/db";
 import userRouter from "./routes/user.routes";
+import movieRouter from "./routes/movies.routes";
 
 const app: Application = express();
 
@@ -28,6 +29,7 @@ app.get("/api/v1/health", (req: Request, res: Response) => {
   });
 });
 app.use("/api/v1/auth",userRouter)
+app.use("api/v1/movies",movieRouter)
 
 connectDB()
   .then(() => {
