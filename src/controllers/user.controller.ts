@@ -147,7 +147,7 @@ export const refreshToken = asyncHandler(async(req:Request,res:Response)=>{
         const newAccessToken = generateAccessToken(user);
         const newRefreshToken = generateRefreshToken(user);
         user.refreshToken = newRefreshToken;
-        user.save({validateBeforeSave:false});
+        await user.save({validateBeforeSave:false});
         res.cookie("accessToken",newAccessToken,options);
         res.cookie("refreshToken",newRefreshToken,options);
         return res.status(200).json(new ApiResponse(200,{},"Tokens refreshed successfully"));

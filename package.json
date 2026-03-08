@@ -4,6 +4,7 @@
   "description": "A show booking Platform",
   "main": "index.js",
   "scripts": {
+    "dev": "nodemon --exec ts-node src/app.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Vansh Kansal",
@@ -19,6 +20,7 @@
     "ioredis": "^5.10.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.3",
+    "nodemon": "^3.1.14",
     "npm": "^11.11.0",
     "slugify": "^1.6.6",
     "zod": "^4.3.6"
