@@ -29,7 +29,7 @@ app.get("/api/v1/health", (req: Request, res: Response) => {
   });
 });
 app.use("/api/v1/auth",userRouter)
-app.use("api/v1/movies",movieRouter)
+app.use("/api/v1/movies",movieRouter)
 
 connectDB()
   .then(() => {

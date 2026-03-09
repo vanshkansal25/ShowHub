@@ -5,6 +5,7 @@ import { ApiError } from "../utils/apiError";
 import { ApiResponse } from "../utils/apiResponse";
 import slugify from "slugify";
 import { Show } from "../models/shows.model";
+import { getCache, setCache } from "../utils/redis";
 
 // ADMIN FUNCTIONS
 
@@ -122,6 +123,12 @@ export const getAllMovies = asyncHandler(
             search,
             upcoming = "false",
         } = req.query;
+
+        const cacheKey = `movies:list:page=${page}:limit=${limit}:genre=${genre || "all"}:language=${language || "all"}:search=${search || "none"}:upcoming=${upcoming}`;
+        const cachedData = await getCache(cacheKey);
+        if(cachedData){
+            return res.status(200).json(new ApiResponse(200, cachedData, "Movies fetched successfully (from cache)"));
+        }
         // building the filter object
         const filter: any = { isDeleted: false };
         if (genre) {
@@ -153,6 +160,7 @@ export const getAllMovies = asyncHandler(
         // total pages
 
         const totalPages = Math.ceil(totalMovies / Number(limit));
+        await setCache(cacheKey,movies,3600)
         return res.status(200).json(
             new ApiResponse(
                 200,
@@ -169,7 +177,7 @@ export const getAllMovies = asyncHandler(
                 "Movies fetched successfully",
             ),
         );
-        //TODO: ADD REDIS IMPLEMENTATION
+        
     }
 );
 //getMoviesByCity
@@ -178,6 +186,11 @@ export const getMoviesByCity = asyncHandler(
         const { city } = req.params;
         if (!city || typeof city !== "string") {
             throw new ApiError(400, "City name is required to fetch movies");
+        }
+        const cacheKey = `movies:city:${city.toLowerCase()}`;
+        const cachedData = await getCache(cacheKey);
+        if(cachedData){
+            return res.status(200).json(new ApiResponse(200, cachedData, `Movies currently showing in ${city} (from cache)`));
         }
         const moviesInCity = await Show.aggregate([
             // 1. Join with Venue to filter by City
@@ -241,6 +254,7 @@ export const getMoviesByCity = asyncHandler(
             // 7. Sort by Rating or Title
             { $sort: { rating: -1 } },
         ]);
+        await setCache(cacheKey,moviesInCity,1800)
         return res
             .status(200)
             .json(
@@ -263,6 +277,11 @@ export const getMovieBySlug = asyncHandler(
         if (!movie) {
             throw new ApiError(404, "Movie not found or has been removed");
         }
+        const cacheKey = `movie:slug:${slug}`;
+        const cachedData = await getCache(cacheKey);
+        if(cachedData){
+            return res.status(200).json(new ApiResponse(200, cachedData, "Movie details fetched successfully (from cache)"));
+        }
         // 2. Check for Active Shows (Optimization)
         // I don't need the full show data here, just a boolean "Is it playing?"
         const hasActiveShows = await Show.exists({
@@ -278,6 +297,7 @@ export const getMovieBySlug = asyncHandler(
             ...movie.toObject(),
             isBookable: !!hasActiveShows, // Converts null/object to true/false
         };
+        await setCache(cacheKey,movieData,3600*6);
         return res
             .status(200)
             .json(
@@ -293,6 +313,11 @@ export const searchMovies = asyncHandler(
         if (!q || typeof q !== "string") {
             throw new ApiError(400, "Search query is required");
         }
+        const cacheKey = `movies:search:${q.toLowerCase().trim().replace(/[^a-z0-9]/g, '_')}`;
+        const cachedData = await getCache(cacheKey);
+        if(cachedData){
+            return res.status(200).json(new ApiResponse(200, cachedData, `Search results for "${q}" (from cache)`));
+        }
         // 1. Perform Text Search
         const movies = await Movie.find({
             $text: { $search: q },
@@ -307,6 +332,7 @@ export const searchMovies = asyncHandler(
         if(movies.length === 0) {
             return res.status(200).json(new ApiResponse(200, [], "No movies found matching your search"));
         }
+        await setCache(cacheKey,movies,3600)
         return res.status(200).json(
             new ApiResponse(200, movies, `Found ${movies.length} movies`)
         );
@@ -318,7 +344,11 @@ export const getComingSoon = asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
         // 1. Define the "Now" timestamp
         const now = new Date();
-
+        const cacheKey = `movies:comingsoon`;
+        const cachedData = await getCache(cacheKey);
+        if(cachedData){
+            return res.status(200).json(new ApiResponse(200, cachedData, "Coming soon movies fetched successfully (from cache)"));
+        }
         // 2. Fetch movies with a future release date
         // We sort by 'releaseDate' ascending (1) so the nearest ones come first
         const movies = await Movie.find({
@@ -335,7 +365,7 @@ export const getComingSoon = asyncHandler(
                 new ApiResponse(200, [], "No upcoming movies at the moment")
             );
         }
-
+        await setCache(cacheKey,movies,3600);
         return res.status(200).json(
             new ApiResponse(200, movies, "Upcoming movies fetched successfully")
         );
@@ -348,6 +378,11 @@ export const getComingSoon = asyncHandler(
 export const getNowShowing = asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => { 
         const { city } = req.query;
+        const cacheKey = `movies:nowshowing:city=${city || "all"}`;
+        const cachedData = await getCache(cacheKey);
+        if(cachedData){
+            return res.status(200).json(new ApiResponse(200, cachedData, `Now showing movies fetched successfully (from cache)`));
+        }
         const pipeline:any[] = [
             {
                 $match:{
@@ -356,6 +391,7 @@ export const getNowShowing = asyncHandler(
                 }
             }
         ]
+        
         // 2. If city is provided, we must join Venue to filter by city
         if(city && typeof city === "string"){
             pipeline.push(
@@ -401,6 +437,13 @@ export const getNowShowing = asyncHandler(
             }
         })
         const movies = await Show.aggregate(pipeline);
+        if(movies.length === 0){
+            return res.status(200).json(
+                new ApiResponse(200, [], "No movies are currently showing in theaters")
+            );
+        }
+
+        await setCache(cacheKey, movies, 1800); // Cache for 30 minutes
         return res.status(200).json(
             new ApiResponse(200, movies, "Now showing movies fetched successfully")
         );
