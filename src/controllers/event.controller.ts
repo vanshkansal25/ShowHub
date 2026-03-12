@@ -105,17 +105,53 @@ export const deleteEvent = asyncHandler(async (req: Request, res: Response, next
     await event.deleteOne()
     return res.status(200).json(new ApiResponse(200, event, "EVENT DELETED SUCCESSFULLY"))
 })
-export const publishEvent = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-
-})
-export const unPublishEvent = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-
-})
 export const getEventDetail = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-
+    const { eventId } = req.params;
+    const organizerId = req.user?.id;
+    if (!organizerId) {
+        throw new ApiError(400, "UNAUTHORIZED")
+    }
+    const event = await Event.findById(eventId)
+    if (!event) {
+        throw new ApiError(400, "Event not found")
+    }
+    if (event.organizerId.toString() !== organizerId) {
+        throw new ApiError(400, "You are not authorized to get this event")
+    }
+    return res.status(200).json(new ApiResponse(200, event, "EVENT DETAIL FETCHED SUCCESSFULLY"))
+})
+export const getEventBySlug = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const { slug } = req.params;
+    if (!slug) {
+        throw new ApiError(400, "Slug is required")
+    }
+    const event = await Event.findOne({
+        slug,
+    }).select("-organizerId -slug").lean()
+    // .lean() is used to make queries faster and lighter by returning plain JavaScript objects instead of full Mongoose documents.
+    if (!event) {
+        throw new ApiError(400, "Event not found")
+    }
+    return res.status(200).json(new ApiResponse(200, event, "EVENT DETAIL FETCHED SUCCESSFULLY"))
 })
 export const getOrganizerEvents = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const organizerId = req.user?.id;
+    if (!organizerId) {
+        throw new ApiError(401, "UNAUTHORIZED")
+    }
+    const { page = 1, limit = 10 } = req.query;
 
+    const skip = (Number(page) - 1) * Number(limit);
+    const [events, totalEvents] = await Promise.all([
+        Event.find({ organizerId }).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+        Event.countDocuments({ organizerId })
+    ])
+    if (!events) {
+        return res.status(200).json(new ApiResponse(200, [], "No Events found"))
+    }
+    const totalPages = Math.ceil(totalEvents / Number(limit));
+    // TODO : ADD REDIS CACHING HERE
+    return res.status(200).json(new ApiResponse(200, { events, pagination: { totalPages, currentPage: Number(page), totalEvents, hasNextPage: Number(page) < totalPages } }, "Events fetched successfully"))
 })
 export const getEvents = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
 

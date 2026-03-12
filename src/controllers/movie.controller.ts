@@ -391,7 +391,7 @@ export const getNowShowing = asyncHandler(
                 }
             }
         ]
-        
+
         // 2. If city is provided, we must join Venue to filter by city
         if(city && typeof city === "string"){
             pipeline.push(
