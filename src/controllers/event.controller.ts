@@ -154,19 +154,87 @@ export const getOrganizerEvents = asyncHandler(async (req: Request, res: Respons
     return res.status(200).json(new ApiResponse(200, { events, pagination: { totalPages, currentPage: Number(page), totalEvents, hasNextPage: Number(page) < totalPages } }, "Events fetched successfully"))
 })
 export const getEvents = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const { page = 1, limit = 10, category, search, date, city, isSoldOut = false } = req.query;
+    const filter: any = {}
+    if (category && typeof category === "string") {
+        filter.category = category
+    }
+    if (city && typeof city === "string") {
+        filter.city = city
+    }
+    if (isSoldOut && typeof isSoldOut === "string") {
+        if (isSoldOut === "true") filter.isSoldOut = true;
+        if (isSoldOut === "false") filter.isSoldOut = false;
+    }
 
+    if (date && typeof date === "string") {
+        const selectedDate = new Date(date)
+        if (isNaN(selectedDate.getTime())) {
+            throw new ApiError(400, "INVALID DATE FORMAT")
+        }
+        const startOfDay = new Date(date)
+        startOfDay.setHours(0, 0, 0, 0)
+        const endOfDay = new Date(date)
+        endOfDay.setHours(23, 59, 59, 999)
+
+        filter.date = {
+            $gt: startOfDay,
+            $lt: endOfDay
+        }
+    }
+    if (search && typeof search === "string") {
+        filter.$text = { $search: search }; // Search across text-indexed fields (e.g. title, category, city) it breaks the search query in seperate words like search : "concert karan" it will return all documents containing concert or karan in any of text-indexed field 
+    }
+    const skip = (Number(page) - 1) * (Number(limit));
+
+    const [events, totalEvents] = await Promise.all([
+        Event.find(filter).sort(search ? { score: { $meta: "textscore" } } : "time").skip(skip).limit(Number(limit)).lean(),
+        Event.countDocuments(filter)
+    ])
+
+    const totalPages = Math.ceil(Number(totalEvents) / Number(limit));
+    return res.status(200).json(new ApiResponse(200, {
+        events,
+        pagination: {
+            totalEvents,
+            totalPages,
+            currentPage: Number(page),
+            hasNextPage: Number(page) < totalPages
+        }
+    }, "Events fetched SucessFully"))
 })
 
 export const getEventsByCity = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const { city } = req.params;
+    const { page = 1, limit = 10, category, isSoldOut } = req.query;
+    if (!city || typeof city === "string") {
+        throw new ApiError(400, "ENTER A VALID CITY")
+    }
+    const skip = (Number(page) - 1) * Number(limit)
 
+    const filter: any = {
+        date: { $gte: new Date() },
+        city: city
+    }
+    if (category && typeof category === "string") {
+        filter.category = category
+    }
+    if (isSoldOut && typeof isSoldOut === "string") {
+        if (isSoldOut === "true") filter.isSoldOut = true;
+        if (isSoldOut === "false") filter.isSoldOut = false;
+    }
+    const events = await Event.find(filter).skip(skip).limit(Number(limit)).lean()
+
+    return res.status(200).json(new ApiResponse(200, events, `EVENTS FOR THE ${city} fetched successfully`))
 })
 
 export const searchEvents = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const { q } = req.query;
 
 })
 
 export const getEventsByCategory = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-
+    const { } = req.query;
 })
 
 export const getUpcomingEvents = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
