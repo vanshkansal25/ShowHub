@@ -228,16 +228,15 @@ export const getEventsByCity = asyncHandler(async (req: Request, res: Response, 
     return res.status(200).json(new ApiResponse(200, events, `EVENTS FOR THE ${city} fetched successfully`))
 })
 
-export const searchEvents = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    const { q } = req.query;
-
-})
-
-export const getEventsByCategory = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    const { } = req.query;
-})
-
 export const getUpcomingEvents = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-
+    const now = new Date()
+    const events = await Event.find({
+        date: { $gte: now },
+        isSoldOut: false
+    }).sort({ date: -1 }).limit(20)
+    if (!events || events.length === 0) {
+        return res.status(200).json(new ApiResponse(200, [], "NO UPCOMING EVENT FOUND"))
+    }
+    return res.status(200).json(new ApiResponse(200, events, "UPCOMING EVENTS FOUND"))
 })
 
