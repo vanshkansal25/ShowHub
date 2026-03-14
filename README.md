@@ -9,8 +9,9 @@ A modern, robust backend platform for booking movies and events, inspired by Boo
   - Admin functionalities for adding, updating, and soft-deleting movies.
   - User endpoints to browse movies by city, search with text-indexes, filter by upcoming/now-showing, and pagination.
   - Highly optimized queries utilizing MongoDB aggregation pipelines.
-- **Event Management (WIP)**: 
+- **Event & Theater Management**: 
   - Organizer capabilities to create, update, and manage events.
+  - Partner functionalities to manage theaters (venues) and layout.
   - User filtering by category, city, date, and availability.
 
 ## Tech Stack
@@ -66,9 +67,26 @@ src/
 - `PATCH /updateMovie/:id` - **(Admin)** Update movie details
 - `DELETE /deleteMovie/:id` - **(Admin)** Soft-delete a movie
 
-### Event Routes (Currently implemented in controllers, pending route mount)
-- CRUD operations for Event Organizers (`/create`, `/update/:eventId`, `/delete/:eventId`)
-- Discovery endpoints for filtering by city, upcoming, and slugs.
+### Event Routes (`/api/v1/events`)
+- `GET /` - Fetch all events
+- `GET /upcoming` - Fetch upcoming events
+- `GET /:slug` - Fetch event details by unique slug
+- `GET /:city` - Fetch events currently actively playing in a specific city
+- `GET /organizer` - **(Event Organizer)** Fetch organizer's events
+- `GET /:eventId` - **(Event Organizer)** Fetch specific event detail
+- `POST /create` - **(Event Organizer)** Create a new event
+- `POST /update/:eventId` - **(Event Organizer)** Update an event
+- `POST /delete/:eventId` - **(Event Organizer)** Delete an event
+
+### Theater Routes (`/api/v1/theaters`)
+- `GET /` - Fetch all theaters
+- `GET /:theaterId` - Fetch theater details
+- `GET /:theaterId/layout` - Fetch layout details of a theater
+- `GET /:theaterId/movies` - Fetch movies playing in a specific theater
+- `GET /partner` - **(Theatre Partner)** Fetch theaters belonging to the partner
+- `POST /create` - **(Theatre Partner)** Add a new theater
+- `PATCH /update/:theaterId` - **(Theatre Partner)** Update theater details
+- `DELETE /delete/:theaterId` - **(Theatre Partner)** Delete a theater
 
 ## Redis Usage
 
@@ -94,5 +112,5 @@ Redis is actively utilized as a caching layer to reduce database load and improv
 ## Current Project Status
 
 **Work in Progress (Active Development)**
-- **Completed**: User authentication flow, Role-Based Access Control, Movie catalogue management, and robust read-optimized caching logic. Event management logic is fully drafted.
-- **Pending/WIP**: Booking endpoints, Show/Seat management, and Payment gateway integrations (controllers are currently scaffolded but empty). Event routes need to be officially mounted to the main Express app.
+- **Completed**: User authentication flow, Role-Based Access Control, Movie catalogue management, Event management APIs, Theater/Venue management APIs, and robust read-optimized caching logic.
+- **Pending/WIP**: Booking endpoints, Show/Seat management, and Payment gateway integrations (controllers are currently scaffolded but empty).
