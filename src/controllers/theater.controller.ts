@@ -223,7 +223,7 @@ export const updateTheater = asyncHandler(async (req: Request, res: Response, ne
 
         for (const row of normalizedRows) {
             for (let col = 1; col <= finalColumns; col++) {
-                validSeats.add(`${row}${col}`);
+                validSeats.add(`${row.trim().toUpperCase()}-${col}`)
             }
         }
 
