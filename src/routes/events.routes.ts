@@ -22,8 +22,8 @@ eventRouter.get("/:eventId", authMiddleware, authorizeRoles("EVENT_ORGANIZER"), 
 eventRouter.get("/organizer", authMiddleware, authorizeRoles("EVENT_ORGANIZER"), getOrganizerEvents)
 
 eventRouter.post("/create", authMiddleware, authorizeRoles("EVENT_ORGANIZER"), createEvent)
-eventRouter.post("/update/:eventId", authMiddleware, authorizeRoles("EVENT_ORGANIZER"), updateEvent)
-eventRouter.post("/delete/:eventId", authMiddleware, authorizeRoles("EVENT_ORGANIZER"), deleteEvent)
+eventRouter.patch("/update/:eventId", authMiddleware, authorizeRoles("EVENT_ORGANIZER"), updateEvent)
+eventRouter.delete("/delete/:eventId", authMiddleware, authorizeRoles("EVENT_ORGANIZER"), deleteEvent)
 
 
 export default eventRouter
