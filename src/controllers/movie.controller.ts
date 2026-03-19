@@ -5,7 +5,7 @@ import { ApiError } from "../utils/apiError";
 import { ApiResponse } from "../utils/apiResponse";
 import slugify from "slugify";
 import { Show } from "../models/shows.model";
-import { getCache, setCache } from "../utils/redis";
+import { getCache, invalidateCacheByPattern, setCache } from "../utils/redis";
 
 // ADMIN FUNCTIONS
 
@@ -49,6 +49,9 @@ export const addMovie = asyncHandler(
             releaseDate: new Date(releaseDate),
             posterUrl,
         });
+        await invalidateCacheByPattern("movies:list:*");
+        await invalidateCacheByPattern("movies:search:*");
+        await invalidateCacheByPattern("movies:comingsoon");
         res
             .status(201)
             .json(new ApiResponse(201, movie, "Movie added successfully"));
@@ -85,6 +88,9 @@ export const updateMovie = asyncHandler(
                 runValidators: true, // Ensure Mongoose schema validation runs
             },
         ).select("-isDeleted");
+        await invalidateCacheByPattern("movies:list:*");
+        await invalidateCacheByPattern("movies:search:*");
+        await invalidateCacheByPattern("movies:comingsoon");
         res
             .status(200)
             .json(new ApiResponse(200, updatedMovie, "Movie updated successfully"));
@@ -103,6 +109,9 @@ export const deleteMovie = asyncHandler(
         if (!movie) {
             throw new ApiError(404, "Movie not found");
         }
+        await invalidateCacheByPattern("movies:list:*");
+        await invalidateCacheByPattern("movies:search:*");
+        await invalidateCacheByPattern("movies:comingsoon");
         return res
             .status(200)
             .json(new ApiResponse(200, {}, "Movie soft-Deleted successfully"));
@@ -228,12 +237,12 @@ export const getMoviesByCity = asyncHandler(
             {
                 $group: {
                     _id: "$movieId", //grouping based on movie id movies with same id grouped together
-                    title: { $first: "$movieDetails.title" }, // $first returns the first value encountered in the group. Because all shows of the same movie have the same title.
-                    slug: { $first: "$movieDetails.slug" },
-                    posterUrl: { $first: "$movieDetails.posterUrl" },
-                    genre: { $first: "$movieDetails.genre" },
-                    language: { $first: "$movieDetails.language" },
-                    rating: { $first: "$movieDetails.rating" },
+                    title: { $first: "$movieDetail.title" }, // $first returns the first value encountered in the group. Because all shows of the same movie have the same title.
+                    slug: { $first: "$movieDetail.slug" },
+                    posterUrl: { $first: "$movieDetail.posterUrl" },
+                    genre: { $first: "$movieDetail.genre" },
+                    language: { $first: "$movieDetail.language" },
+                    rating: { $first: "$movieDetail.rating" },
                     // Also counting how many theaters are playing this
                     totalTheaters: { $addToSet: "$venueId" },
                 },
@@ -405,7 +414,7 @@ export const getNowShowing = asyncHandler(
                 },{
                     $unwind:"$venueDetails"
                 },{
-                    $match: { "venue.city": { $regex: new RegExp(city as string, "i") } }
+                    $match: { "venueDetails.city": { $regex: new RegExp(city as string, "i") } }
                 }
             )
         }

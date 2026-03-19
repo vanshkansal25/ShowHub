@@ -19,8 +19,8 @@ export interface IBooking {
 const bookingSchema = new Schema<IBooking>({
     bookingId:{type:String, unique:true,uppercase:true,index:true},
     userId:{type:Schema.Types.ObjectId,ref:'User',required:true,index:true},
-    showId:{type:Schema.Types.ObjectId,ref:'Venue',rquired:true,index:true},
-    seatIds:[{type:Schema.Types.ObjectId,ref:'Venue',rquired:true}],
+    showId: { type: Schema.Types.ObjectId, ref: 'Show', required: true },
+    seatIds: [{ type: Schema.Types.ObjectId, ref: 'Seat', required: true }],
     seatNumbers:[{type:String,required:true}],
     totalAmount:{type:Number,required:true},
     status:{

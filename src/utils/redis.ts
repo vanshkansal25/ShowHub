@@ -23,6 +23,10 @@ export const getCache = async (key: string) => {
     return data ? JSON.parse(data) : null;
 }
 
-// export const invalidateCache = async()={
-    
-// }
+export const invalidateCacheByPattern = async (pattern: string) => {
+    const keys = await redis.keys(pattern);
+
+    if (keys.length === 0) return;
+
+    await redis.del(...keys);
+};

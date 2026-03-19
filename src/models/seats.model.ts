@@ -7,9 +7,7 @@ export interface ISeat {
     seatNumber: string;                // e.g., "A12"
     tierName: string;                  // e.g., "GOLD" (copied from Theater for speed)
     price: number;                     // The actual price for this show
-    status: 'AVAILABLE' | 'LOCKED' | 'BOOKED';
-    lockedBy?: mongoose.Types.ObjectId; // UserID who is currently hovering/selecting
-    lockExpiresAt?: Date;              // TTL for the temporary lock
+    status: 'AVAILABLE' | 'BOOKED';
     bookingId?: mongoose.Types.ObjectId; // Final reference once booked
 }
 
@@ -23,12 +21,10 @@ const seatSchema = new Schema<ISeat>({
     price: { type: Number, required: true },
     status: { 
         type: String, 
-        enum: ['AVAILABLE', 'LOCKED', 'BOOKED'], 
+        enum: ['AVAILABLE', 'BOOKED'], 
         default: 'AVAILABLE',
         index: true 
     },
-    lockedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-    lockExpiresAt: { type: Date },
     bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' }
 }, { timestamps: true });
 
