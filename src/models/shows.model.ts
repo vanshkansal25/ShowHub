@@ -11,7 +11,7 @@ export interface IShow {
     movieId?: mongoose.Types.ObjectId; // Optional if it's an Event
     eventId?: mongoose.Types.ObjectId; // Optional if it's a Movie
     venueId: mongoose.Types.ObjectId;
-    hallId: mongoose.Types.ObjectId;
+    hallId?: mongoose.Types.ObjectId;
     startTime: Date;
     endTime: Date;
     pricing: ITierPricing[];           // Structured pricing and capacity
@@ -24,7 +24,7 @@ const showSchema = new Schema<IShow>({
     movieId: { type: Schema.Types.ObjectId, ref: 'Movie', index: true },
     eventId: { type: Schema.Types.ObjectId, ref: 'Event', index: true },
     venueId: { type: Schema.Types.ObjectId, ref: 'Venue', required: true, index: true },
-    hallId: { type: Schema.Types.ObjectId, ref: 'Theater', required: true },
+    hallId: { type: Schema.Types.ObjectId, ref: 'Theater'},
     startTime: { type: Date, required: true, index: true },
     endTime: { type: Date, required: true },
     pricing: [{
