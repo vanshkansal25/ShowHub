@@ -10,6 +10,7 @@ import { Movie } from "../models/movies.model";
 import { Event } from "../models/events.model";
 import { Venue } from "../models/venues.model";
 import { Theater } from "../models/theaters.model";
+import { Booking } from "../models/bookings.model";
 
 // createShow
 
@@ -94,8 +95,100 @@ export const createShow = asyncHandler(async(req:Request,res:Response)=>{
     return res.status(200).json(new ApiResponse(20,show,"SHOW CREATED SUCCESSFULLY"))
 })
 // updateShow
-export const UpdateShow = asyncHandler(async(req:Request,res:Response)=>{
-    
+export const updateShow = asyncHandler(async(req:Request,res:Response)=>{
+    const {showId} = req.params;
+    const {movieId,eventId,venueId,hallId,startTime,endTime,pricing} = req.body;
+    if(!movieId && !eventId){
+        throw new ApiError(400,"Either movieId or eventId is required")
+    }
+    if(movieId && eventId){
+        throw new ApiError(400,"Either movieId or eventId is required")
+    }
+    if(!showId || !!mongoose.Types.ObjectId.isValid(showId as string)){
+        throw new ApiError(400,"Invalid ShowId")
+    }
+    const show = await Show.findById(showId)
+    if(!show){
+        throw new ApiError(400,"Show with this id not found")
+    }
+    // which are the shows i cant update -> if it already started , if it has bookings
+    const now = new Date()
+
+    const isStarted = show.startTime <= now ;
+
+    const hasBooking = await Booking.exists({
+        showId : showId,
+        status:"CONFIRMED"
+    })
+    if(hasBooking){
+        if(movieId && movieId.toString() !== show.movieId?.toString()){
+            throw new ApiError(400,"Cannot change movie after bookings exist")
+        }
+        if (eventId && eventId.toString() !== show.eventId?.toString()) {
+            throw new ApiError(400, "Cannot change event after bookings exist");
+        }
+        if (hallId && hallId.toString() !== show.hallId?.toString()) {
+            throw new ApiError(400, "Cannot change hall after bookings exist");
+        }
+    }
+    if(isStarted){
+        throw new ApiError(400,"Cannot modify running/completed show")
+    }
+    if(venueId){
+        const venue = await Venue.findById(venueId)
+        if(!venue) throw new ApiError(400,"Venue with this venueId not found");
+    }
+    if(hallId){
+        const hall = await Theater.findById(hallId)
+        if(!hall) throw new ApiError(400,"Hall with this hallId not found");
+    }
+    let newStart = show.startTime;
+    let newEnd = show.endTime;
+
+    if(startTime) newStart = new Date(startTime);
+    if(endTime) newEnd = new Date(endTime);
+
+    if (newStart >= newEnd) {
+        throw new ApiError(400, "End time must be after start time");
+    }
+
+    // check for overlap shows
+    if (hallId || startTime || endTime) {
+        const overlappingShow = await Show.findOne({
+            hallId: hallId || show.hallId,
+            _id: { $ne: showId },
+            status: { $in: ["Active", "Ongoing"] },
+            startTime: { $lt: newEnd },
+            endTime: { $gt: newStart }
+        });
+
+        if (overlappingShow) {
+            throw new ApiError(400, "Another show overlaps with this time");
+        }
+    }
+
+    const updateFields : any = {}
+
+    if (movieId) updateFields.movieId = movieId;
+    if (eventId) updateFields.eventId = eventId;
+    if (venueId) updateFields.venueId = venueId;
+    if (hallId) updateFields.hallId = hallId;
+    if (startTime) updateFields.startTime = newStart;
+    if (endTime) updateFields.endTime = newEnd;
+    if (pricing) updateFields.pricing = pricing;
+    if (status) updateFields.status = status;
+
+    const updatedShow = await Show.findByIdAndUpdate(
+        showId,
+        { $set: updateFields }
+    )
+    await invalidateCacheByPattern("shows:movie:*");
+    await invalidateCacheByPattern("shows:event:*");
+    await invalidateCacheByPattern("movies:nowshowing:*");
+    await invalidateCacheByPattern("movies:city:*");
+
+    return res.status(200).json(new ApiResponse(200,updatedShow,"Show Updated Successfully"))
+
 })
 // deleteShow
 export const deleteShow = asyncHandler(async(req:Request,res:Response)=>{
