@@ -8,6 +8,7 @@ import movieRouter from "./routes/movies.routes";
 import eventRouter from "./routes/events.routes";
 import theaterRouter from "./routes/theaters.routes";
 import showRouter from "./routes/shows.routes";
+import venueRouter from "./routes/venues.routes";
 
 const app: Application = express();
 
@@ -35,8 +36,8 @@ app.use("/api/v1/auth", userRouter)
 app.use("/api/v1/movies", movieRouter)
 app.use("/api/v1/events", eventRouter)
 app.use("/api/v1/theaters", theaterRouter)
-app.use("api/v1/shows",showRouter)
-
+app.use("/api/v1/shows",showRouter)
+app.use("/api/v1/venues",venueRouter)
 connectDB()
   .then(() => {
     app.listen(PORT, () => {
