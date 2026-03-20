@@ -192,7 +192,54 @@ export const updateShow = asyncHandler(async(req:Request,res:Response)=>{
 })
 // deleteShow
 export const deleteShow = asyncHandler(async(req:Request,res:Response)=>{
-    
+    const {showId} = req.params;
+    if(!showId || !mongoose.Types.ObjectId.isValid(showId as string)){
+        throw new ApiError(400,"Invalid showId");
+    }
+    const show = await Show.findById(showId);
+    if(!show){
+        throw new ApiError(400,"Show with this showId did not exist")
+    }
+    // which shows i can delete -> that are not ongoing yet
+    const now = new Date();
+    if(show.startTime <= now){
+        throw new ApiError(400, "Cannot delete a show that has already started");
+    }
+
+    // check for booking if it exist refund
+    const hasBooking = await Booking.exists({
+        showId:showId,
+        status:"CONFIRMED"
+    })
+    if(hasBooking){
+        show.status = "Cancelled"
+        await show.save()
+
+        // TODO : ADD REFUND in Queue 
+
+        await invalidateCacheByPattern("shows:movie:*");
+        await invalidateCacheByPattern("shows:event:*");
+        await invalidateCacheByPattern("movies:nowshowing:*");
+        await invalidateCacheByPattern("movies:city:*");
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                {},
+                "Show cancelled successfully. Refunds will be processed shortly."
+            )
+        );
+    }
+    await Show.findByIdAndDelete(showId);
+
+    await invalidateCacheByPattern("shows:movie:*");
+    await invalidateCacheByPattern("shows:event:*");
+    await invalidateCacheByPattern("movies:nowshowing:*");
+    await invalidateCacheByPattern("movies:city:*");
+
+    return res.status(200).json(
+        new ApiResponse(200, {}, "Show deleted successfully")
+    );
 })
 
 // getShowsByMovie
@@ -376,5 +423,13 @@ export const getShowsByEvent = asyncHandler(async (req: Request, res: Response) 
 
 // getShowDetails
 export const getShowDetails = asyncHandler(async (req: Request, res: Response) => {
-
+    const { showId } = req.params;
+    if(!showId || !mongoose.Types.ObjectId.isValid(showId as string)){
+        throw new ApiError(400,"Invalid showId");
+    }
+    const show = await Show.findById(showId).lean();
+    if(!show){
+        throw new ApiError(400,"Show with this showId did not exist")
+    }
+    return res.status(200).json(new ApiResponse(200,show,"Show fetched Successfully"))
 })
