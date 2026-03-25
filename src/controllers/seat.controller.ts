@@ -51,7 +51,39 @@ export const getSeatMap = asyncHandler(async (req: Request, res: Response) => {
 })
 // getAvailableSeats
 export const getAvailableSeats = asyncHandler(async (req: Request, res: Response) => {
+    const { showId } = req.params;
+    if(!showId || !mongoose.Types.ObjectId.isValid(showId as string)){
+        throw new ApiError(400, "Invalid Show Id");
+    }
+    const show = await Show.findById(showId).lean();
+    if(!show || show.status == "Cancelled"){
+        throw new ApiError(400,"Show not Found")
+    }
+    if(!show.hallId){
+        throw new ApiError(400,"No hall assigned to this show");
+    }
+    // fetch hall + seats 
+    const [hall,seats] = await Promise.all([
+        Theater.findById(show.hallId).lean(),
+        Seat.find({
+            showId,
+            status:"AVAILABLE",
+        }).lean()
+    ])
+    if (!hall) {
+        throw new ApiError(404, "Hall not found");
+    }
 
+    const response = {
+        show:{
+            _id: show._id,
+            status:show.status,
+            pricing:show.pricing
+        },
+        layout:hall.seatingLayout,
+        seats
+    }
+    return res.status(200).json(new ApiResponse(200,response,"Available Seats fetched Successfully"))
 })
 // lockSeats  -- triggered via websocket
 export const lockSeats = asyncHandler(async (req: Request, res: Response) => {
@@ -114,7 +146,46 @@ export const lockSeats = asyncHandler(async (req: Request, res: Response) => {
 })
 // releaseSeats -- triggered via websocket
 export const releaseSeats = asyncHandler(async (req: Request, res: Response) => {
+    // here i need to consider only the person who locks the seat can release it -- thats why i stored userId in redis with seat lock
+    const { showId } = req.params;
+    const {seatNumbers} = req.body;
+    const userId = req.user?.id;
+    if(!showId || !seatNumbers || !Array.isArray(seatNumbers)){
+        throw new ApiError(400,"Invalid Input")
+    }
+    if(!userId){
+        throw new ApiError(400,"Unauthorized")
+    }
+    const lockKeys = seatNumbers.map((seat)=>`seat:lock:${showId}:${seat}`)
 
+    // fetch existing locked keys
+    const locks = await Promise.all(
+        lockKeys.map((key)=> redis.get(key))
+    )
+    // which seats to be delete and which keys to be released
+
+    const keysToDelete:string[] = [];
+    const seatToRelease: string[] = [];
+
+    locks.forEach((lockOwner,index)=>{
+        if(lockOwner === userId.toString()){
+            keysToDelete.push(lockKeys[index]);
+            seatToRelease.push(seatNumbers[index]);
+        }
+    })
+    // Delete only owned locks
+    if(keysToDelete.length >0){
+        await redis.del(keysToDelete)
+    }
+
+    // TODO : EMIT SOCKET EVENT OF SEAT RELEASING
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            { seatToRelease },
+            "Seats released successfully"
+        )
+    );
 })
 // getSeatStatus
 export const getSeatStatus = asyncHandler(async (req: Request, res: Response) => {
