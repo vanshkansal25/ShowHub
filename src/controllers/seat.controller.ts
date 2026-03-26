@@ -7,7 +7,10 @@ import { getCache, redis, setCache } from "../utils/redis";
 import { ApiResponse } from "../utils/apiResponse";
 import { Theater } from "../models/theaters.model";
 import { Seat } from "../models/seats.model";
+import { getIO } from "../sockets";
 
+
+const io = getIO();
 
 // how whole seat booking system work -> getSeatMap to get the snapshot of the seat map of available and booked seats this is just a snapshot not a realtime thing , i will handle real time thing using web sockets because if i make this controller realtime there will be heavy load on database
 // getSeatMap
@@ -126,7 +129,7 @@ export const lockSeats = asyncHandler(async (req: Request, res: Response) => {
 
     // check all locks succeeded
 
-    const failedIndex = results?.findIndex((res) => res === null);
+    const failedIndex = results?.findIndex((res) => res[1] === null);
 
     if (failedIndex !== -1 || failedIndex !== undefined) {
         // rollback (in case of any transaction fails)
@@ -136,8 +139,11 @@ export const lockSeats = asyncHandler(async (req: Request, res: Response) => {
             "Seat could not be locked"
         );
     }
-
-    // TODO : EMIT SOCKET EVENT OF SEAT LOCKING
+    // Flow --> User opens seat page, client emit "join_show" which will make them join same show room with a showId and when some lock the seat server emit a event of seat locking 
+    io.to(showId).emit("seat_locked",{
+        seatNumbers,
+        userId
+    })
 
     return res.status(200).json(
         new ApiResponse(200, { seatNumbers }, "Seats locked successfully")
@@ -178,7 +184,10 @@ export const releaseSeats = asyncHandler(async (req: Request, res: Response) => 
         await redis.del(keysToDelete)
     }
 
-    // TODO : EMIT SOCKET EVENT OF SEAT RELEASING
+    io.to(showId).emit("seats_released", {
+        seatNumbers: seatToRelease,
+        userId
+    });
     return res.status(200).json(
         new ApiResponse(
             200,
@@ -187,33 +196,4 @@ export const releaseSeats = asyncHandler(async (req: Request, res: Response) => 
         )
     );
 })
-// getSeatStatus
-export const getSeatStatus = asyncHandler(async (req: Request, res: Response) => {
 
-})
-
-// createSeatLayout
-export const createSeatLayout = asyncHandler(async (req: Request, res: Response) => {
-
-})
-// updateSeatLayout
-export const updateSeatLayout = asyncHandler(async (req: Request, res: Response) => {
-
-})
-// createSeatCatogory
-export const createSeatCatogory = asyncHandler(async (req: Request, res: Response) => {
-
-})
-// updateSeatCatogory
-export const updateSeatCatogory = asyncHandler(async (req: Request, res: Response) => {
-
-})
-
-// setSeatPricing
-export const setSeatPricing = asyncHandler(async (req: Request, res: Response) => {
-
-})
-// updateSeatPricing
-export const updateSeatPricing = asyncHandler(async (req: Request, res: Response) => {
-
-})

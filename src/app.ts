@@ -2,6 +2,7 @@ import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import "dotenv/config";
+import http from "http";
 import connectDB from "./config/db";
 import userRouter from "./routes/user.routes";
 import movieRouter from "./routes/movies.routes";
@@ -9,8 +10,13 @@ import eventRouter from "./routes/events.routes";
 import theaterRouter from "./routes/theaters.routes";
 import showRouter from "./routes/shows.routes";
 import venueRouter from "./routes/venues.routes";
+import { initSocket } from "./sockets";
 
+//Express alone ≠ WebSocket server , socketIo need a http server instance
 const app: Application = express();
+const server = http.createServer(app);
+
+initSocket(server)
 
 const PORT = process.env.PORT || 3000;
 
@@ -40,7 +46,7 @@ app.use("/api/v1/shows",showRouter)
 app.use("/api/v1/venues",venueRouter)
 connectDB()
   .then(() => {
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(
         `Server is running on port ${PORT} and MongoDB is connected successfully`,
       );
