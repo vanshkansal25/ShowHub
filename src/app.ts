@@ -11,8 +11,9 @@ import theaterRouter from "./routes/theaters.routes";
 import showRouter from "./routes/shows.routes";
 import venueRouter from "./routes/venues.routes";
 import { initSocket } from "./sockets";
+import seatRouter from "./routes/seats.routes";
 
-//Express alone ≠ WebSocket server , socketIo need a http server instance
+//Express alone != WebSocket server , socketIo need a http server instance
 const app: Application = express();
 const server = http.createServer(app);
 
@@ -44,6 +45,7 @@ app.use("/api/v1/events", eventRouter)
 app.use("/api/v1/theaters", theaterRouter)
 app.use("/api/v1/shows",showRouter)
 app.use("/api/v1/venues",venueRouter)
+app.use("/api/v1/seats",seatRouter)
 connectDB()
   .then(() => {
     server.listen(PORT, () => {
