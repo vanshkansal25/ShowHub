@@ -104,7 +104,34 @@ export const getBookingById = asyncHandler(async (req: Request, res: Response) =
 })
 // getUserBookings
 export const getUserBookings = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if(!userId){
+        throw new ApiError(401,"Unauthorized")
+    }
+    const {page = 1 , limit = 10 , status} = req.query;
+    const skip = (Number(page)-1)*Number(limit);
+    const filter : any = {
+        userId,
+    }
+    if (status && typeof status === "string") {
+        filter.status = status;
+    }
+    const [bookings,total] = await Promise.all([
+        Booking.find(filter).skip(skip).limit(Number(limit)).sort({createdAt:-1}).lean(),
+        Booking.countDocuments(filter)
+    ])
 
+    const totalPages = Math.ceil(total/Number(limit));
+    const response = {
+        bookings,
+        pagination:{
+            total,
+            totalPages,
+            currentPage:Number(page),
+            hasNextPage:Number(page)<totalPages,
+        }
+    }
+    return res.status(200).json(new ApiResponse(200,response,"User bookings fetched successfully"))
 })
 // cancelBooking
 export const cancelBookings = asyncHandler(async (req: Request, res: Response) => {
@@ -112,10 +139,6 @@ export const cancelBookings = asyncHandler(async (req: Request, res: Response) =
 })
 // validateQR
 export const validateQR = asyncHandler(async (req: Request, res: Response) => {
-
-})
-// downloadTicket
-export const downloadTicket = asyncHandler(async (req: Request, res: Response) => {
 
 })
 // getShowBookings
