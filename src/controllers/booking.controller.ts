@@ -7,6 +7,8 @@ import { Booking } from "../models/bookings.model";
 import { ApiResponse } from "../utils/apiResponse";
 import { redis } from "../utils/redis";
 import { Seat } from "../models/seats.model";
+import mongoose from "mongoose";
+import { Show } from "../models/shows.model";
 
 export const createBooking = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     const { showId } = req.params;
@@ -72,7 +74,65 @@ export const createBooking = asyncHandler(async (req: Request, res: Response, ne
     );
 })
 
-export const confirmBooking = asyncHandler(async(req: Request, res: Response) => { 
+export const confirmBooking = asyncHandler(async(job:any) => { 
+    const {bookingId,paymentId} = job.data;
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try{
+        // fetch booking
+        const booking = await Booking.findOne({bookingId}).session(session);
+        if(!booking){
+            throw new Error("Booking Not Found")
+        }
+        // check for if booking is already confirmed
+
+        if(booking.status === "CONFIRMED"){
+            return; // already processed
+        }
+        if(booking.status !== "PENDING"){
+            throw new Error("Invalid booking state");
+        }
+        // update db
+
+        const updateDB = await Seat.updateMany({
+            _id:{$in:booking.seatIds},
+            status:"AVAILABLE"
+        },{
+            $set:{
+                status:"BOOKED",
+                bookingId:booking._id
+            }
+        },{session})
+
+        if(updateDB.modifiedCount !== booking.seatIds.length){
+            throw new Error("Seat conflict detected")
+        }
+
+        booking.status = "CONFIRMED";
+        booking.paymentId = paymentId;
+
+        booking.qrCode = `QR-${booking.bookingId}-${Date.now()}`
+
+        await booking.save({session})
+
+        // clear redis locks
+
+        const lockKeys = booking.seatNumbers.map((seat)=>`seat:lock:${booking.showId}:${seat}`)
+
+        if(lockKeys.length > 0){
+            await redis.del(lockKeys)
+        }
+
+        await session.commitTransaction();
+        session.endSession();
+        console.log(`BOOKING CONFIRMED:${booking.bookingId}`)
+    }catch(error:any){
+        await session.abortTransaction();
+        session.endSession();
+        console.error("Booking confirmation failed",error.message)
+        throw error;// for bullmq to retry
+    }
 })
 // getBookingById
 export const getBookingById = asyncHandler(async (req: Request, res: Response) => {
@@ -135,7 +195,65 @@ export const getUserBookings = asyncHandler(async (req: Request, res: Response) 
 })
 // cancelBooking
 export const cancelBookings = asyncHandler(async (req: Request, res: Response) => {
+    const {bookingId} = req.params;
+    const userId = req.user?.id;
+    if(!bookingId){
+        throw new ApiError(400,"Booking ID is required")
+    }
+    if(!userId){
+        throw new ApiError(401,"Unauthorized")
+    }
+    const booking = await Booking.findOne({bookingId})
+    if(!booking){
+        throw new ApiError(404,"Booking not found")
+    }
+    if(booking.userId.toString() !== userId.toString()){
+        throw new ApiError(401,"Not allowed to cancel this booking")
+    }
+    if(booking.status === "CANCELLED"){
+        throw new ApiError(400,"Booking already cancelled")
+    }
+    if(booking.status !== "CONFIRMED"){
+        throw new ApiError(400,"Only confirmed booking can be cancelled")
+    }
 
+    // I cannot cancel booking if show is already started, as of now Im letting people cancel booking just before show timings
+    const show = await Show.findById(booking.showId);
+    if(!show){
+        throw new ApiError(404,"Show not found")
+    }
+    const now = new Date();
+    if(show.startTime <= now){
+        throw new ApiError(400,"Cannot Cancel after show has started")
+    }
+
+    // transaction 
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        booking.status = "CANCELLED";
+        await booking.save({session});
+        await Seat.updateMany({
+            _id:{$in : booking.seatIds},
+            bookingId : booking._id
+        },{
+            $set:{
+                status:"AVAILABLE",
+                bookingId:null
+            }
+        },{session})
+
+        await session.commitTransaction();
+        session.endSession()
+
+        //TODO: add refund processing to the queue
+
+        return res.status(200).json(new ApiResponse(200,{},"Booking cancelled successfully,refund Initiated"))
+    } catch (error:any) {
+        session.abortTransaction();
+        session.endSession();
+        throw error;
+    }
 })
 // validateQR
 export const validateQR = asyncHandler(async (req: Request, res: Response) => {
