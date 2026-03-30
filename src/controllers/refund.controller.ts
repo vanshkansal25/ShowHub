@@ -1,10 +1,6 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 
-// createRefund
-export const createRefund = asyncHandler(async (req: Request, res: Response) => {
-
-})
 // approveRefund
 export const approveRefund = asyncHandler(async (req: Request, res: Response) => {
 
