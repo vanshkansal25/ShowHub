@@ -23,6 +23,9 @@ A modern, robust backend platform for booking movies and events, inspired by Boo
 - **Caching**: Redis (ioredis)
 - **Validation**: Zod
 - **Security**: bcrypt, jsonwebtoken
+- **Real-time**: Socket.IO
+- **Message Queue**: BullMQ
+- **Payments**: Razorpay
 
 ## Backend Architecture Overview
 
@@ -88,6 +91,25 @@ src/
 - `PATCH /update/:theaterId` - **(Theatre Partner)** Update theater details
 - `DELETE /delete/:theaterId` - **(Theatre Partner)** Delete a theater
 
+### Show Routes (`/api/v1/shows`)
+- `GET /movie/:movieId` - Fetch shows for a specific movie
+- `GET /event/:eventId` - Fetch shows for a specific event
+- `GET /:showId` - Fetch show details
+- `POST /create` - **(Admin, Event Organizer, Theatre Partner)** Create a new show
+- `PATCH /update/:showId` - **(Admin, Event Organizer, Theatre Partner)** Update a show
+- `DELETE /delete/:showId` - **(Admin, Event Organizer, Theatre Partner)** Delete a show
+
+### Venue Routes (`/api/v1/venues`)
+- `GET /:city` - Fetch venues by city
+- `GET /:showId` - Fetch venue details for a show
+- `GET /:venueId` - Fetch shows playing at a specific venue
+- `POST /create` - **(Admin, Event Organizer, Theatre Partner)** Create a new venue
+
+### Seat Routes (`/api/v1/seats`)
+- `GET /:showId/seatmap` - Fetch the interactive seat map for a show
+- `GET /:showId/availableseats` - Fetch available seat IDs for a show
+- `POST /:showId` - **(Authenticated)** Lock or release seats for a show (Real-time updates via Socket.IO)
+
 ## Redis Usage
 
 Redis is actively utilized as a caching layer to reduce database load and improve response times for high-traffic movie discovery endpoints. 
@@ -112,5 +134,5 @@ Redis is actively utilized as a caching layer to reduce database load and improv
 ## Current Project Status
 
 **Work in Progress (Active Development)**
-- **Completed**: User authentication flow, Role-Based Access Control, Movie catalogue management, Event management APIs, Theater/Venue management APIs, and robust read-optimized caching logic.
-- **Pending/WIP**: Booking endpoints, Show/Seat management, and Payment gateway integrations (controllers are currently scaffolded but empty).
+- **Completed**: User authentication flow, Role-Based Access Control, Movie catalogue management, Event management APIs, Theater/Venue management APIs, Show & Seat management with real-time Socket.IO updates, and robust read-optimized caching logic.
+- **Pending/WIP**: Booking endpoints, Queue-based job processing (BullMQ), and Payment gateway integrations (Razorpay). Waitlist and transaction flows are actively being scaffolded.
