@@ -21,7 +21,6 @@ A modern, robust backend platform for booking movies and events, inspired by Boo
 - **Language**: TypeScript
 - **Database**: MongoDB (Mongoose)
 - **Caching**: Redis (ioredis)
-- **Validation**: Zod
 - **Security**: bcrypt, jsonwebtoken
 - **Real-time**: Socket.IO
 - **Message Queue**: BullMQ
@@ -46,7 +45,6 @@ src/
 ├── middlewares/           # Auth and role authorization guards
 ├── models/                # Mongoose schemas (Users, Movies, Events, Shows, etc.)
 ├── routes/                # Express route definitions
-├── schemas/               # Zod validation schemas
 └── utils/                 # Utility functions (ApiError, ApiResponse, asyncHandler, redis)
 ```
 
@@ -78,8 +76,8 @@ src/
 - `GET /organizer` - **(Event Organizer)** Fetch organizer's events
 - `GET /:eventId` - **(Event Organizer)** Fetch specific event detail
 - `POST /create` - **(Event Organizer)** Create a new event
-- `POST /update/:eventId` - **(Event Organizer)** Update an event
-- `POST /delete/:eventId` - **(Event Organizer)** Delete an event
+- `PATCH /update/:eventId` - **(Event Organizer)** Update an event
+- `DELETE /delete/:eventId` - **(Event Organizer)** Delete an event
 
 ### Theater Routes (`/api/v1/theaters`)
 - `GET /` - Fetch all theaters
@@ -110,6 +108,16 @@ src/
 - `GET /:showId/availableseats` - Fetch available seat IDs for a show
 - `POST /:showId` - **(Authenticated)** Lock or release seats for a show (Real-time updates via Socket.IO)
 
+### Booking Routes (`/api/v1/booking`)
+- `POST /book/:showId` - **(Authenticated)** Create a new booking
+- `GET /bookings` - **(Authenticated)** Get all bookings for the logged-in user
+- `GET /:bookingId` - **(Authenticated)** Get booking details by ID
+- `PATCH /:bookingId/cancel` - **(Authenticated)** Cancel a booking and initiate refund
+
+### Payment Routes (`/api/v1/payment`)
+- `POST /intent` - **(Authenticated)** Create a payment intent (Razorpay order)
+- `POST /verify` - **(Authenticated)** Verify a completed payment
+
 ## Redis Usage
 
 Redis is actively utilized as a caching layer to reduce database load and improve response times for high-traffic movie discovery endpoints. 
@@ -130,9 +138,16 @@ Redis is actively utilized as a caching layer to reduce database load and improv
 - **Database Text Indexing**: Employs MongoDB `$text` search capabilities combined with textScore sorting for performant and relevant search results.
 - **Redis Caching Strategy**: Employs key-based caching for computationally heavy aggregations and frequently requested read-heavy data, drastically minimizing database hits.
 - **Pagination**: Implemented extensively on list endpoints to manage payload size and query execution time effectively.
+- **Asynchronous Task Queuing**: Utilizes BullMQ & Redis for processing resilient background jobs like booking confirmations and payment refunds. Decoupling this heavy logic ensures high availability and fast API responses.
+
+## Queue & Worker Implementations
+
+Background processing is decoupled using **BullMQ** to ensure main API threads remain unblocked:
+- **Booking Worker**: Handles the final confirmation of seat bookings asynchronously. Once a payment is verified, the worker executes a distributed MongoDB transaction to secure the allocated seats, issue a QR-Code, clear Redis seat locks, and mark the booking as confirmed.
+- **Refund Worker**: In cases of strict cancellations, communicates with the Razorpay API to process user refunds automatically. Incorporates exponential backoff and localized retry policies in case of external gateway downtime.
 
 ## Current Project Status
 
 **Work in Progress (Active Development)**
-- **Completed**: User authentication flow, Role-Based Access Control, Movie catalogue management, Event management APIs, Theater/Venue management APIs, Show & Seat management with real-time Socket.IO updates, and robust read-optimized caching logic.
-- **Pending/WIP**: Booking endpoints, Queue-based job processing (BullMQ), and Payment gateway integrations (Razorpay). Waitlist and transaction flows are actively being scaffolded.
+- **Completed**: User authentication flow, Role-Based Access Control, Movie/Event catalogue management, Theater/Venue management APIs, Show & Seat management with Socket.IO updates, Bookings, Payment gateway integrations (Razorpay) and Refunds,Queue-based job processing (BullMQ refunds & booking confirmations).
+- **Pending/WIP**: Waitlist flows, and QR Code generation for tickets.
