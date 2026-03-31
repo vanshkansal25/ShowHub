@@ -11,7 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "bullmq": "^5.70.1",
+    "bullmq": "^5.71.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "crypto": "^1.0.1",
