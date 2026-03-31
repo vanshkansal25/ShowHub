@@ -2,7 +2,7 @@ import { Queue } from "bullmq";
 import { redis } from "../utils/redis";
 
 
-const bookingQueue = new Queue("booking_queue",{
+export const bookingQueue = new Queue("booking_queue",{
     connection:redis,
     defaultJobOptions:{
         attempts:5,

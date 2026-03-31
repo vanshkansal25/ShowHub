@@ -10,7 +10,6 @@ export const bookingWorker = new Worker("booking_queue",async(job:Job) => {
     const {bookingId,paymentId} = job.data;
     const session = await mongoose.startSession();
     session.startTransaction();
-
     try{
         // fetch booking
         const booking = await Booking.findOne({bookingId}).session(session);
@@ -67,4 +66,8 @@ export const bookingWorker = new Worker("booking_queue",async(job:Job) => {
     }
 },{
     connection:redis
+})
+
+bookingWorker.on("failed",(job,err)=>{
+    console.error(`[Worker] Job ${job?.id} failed: ${err.message}`);
 })

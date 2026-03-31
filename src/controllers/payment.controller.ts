@@ -7,6 +7,8 @@ import { ApiResponse } from "../utils/apiResponse";
 import crypto from "crypto";
 import { Payment } from "../models/payments.model";
 import { Refund } from "../models/refund.model";
+import { bookingQueue, refundQueue } from "../queues";
+
 // createPaymentIntent
 export const createPaymentIntent = asyncHandler(async (req: Request, res: Response) => {
     const {bookingId} = req.body;
@@ -77,8 +79,6 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
     if(!booking){
         throw new ApiError(400,"Booking not found")
     }
-
-
     const existingPayment = await Payment.findOne({
         transactionId:paymentId
     })
@@ -93,36 +93,19 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
         amount:booking.totalAmount
     })
     // TODO :add confirmBooking to queue
+    await bookingQueue.add("confirmBooking",{
+        bookingId:booking.bookingId,
+        paymentId:paymentId
+    })
 
     return res.status(200).json(new ApiResponse(200,payment,"Payment Verified Successfully"))
 
 
 })
 // refundPayment
-export const refundPayment = asyncHandler(async (req: Request, res: Response) => {
+export const initiateRefund = async (booking:any,userId:string) => {
     // only refund in case of cancelled booking
     // take care of double refund
-
-    const {bookingId} = req.params;
-    const userId = req.user?.id;
-    if(!bookingId){
-        throw new ApiError(400,"Booking Id is required")
-    }
-    if(!userId){
-        throw new ApiError(401,"Unauthorized")
-    }
-    const booking = await Booking.findOne({bookingId});
-
-    if(!booking){
-        throw new ApiError(400,"Booking not found")
-    }
-
-    if(booking.userId.toString() !== userId.toString()){
-        throw new ApiError(401,"Unauthorized for this request")
-    }
-    if(booking.status !== "CANCELLED"){
-        throw new ApiError(401,"Refund is only allowed for cancelled booking")
-    }
     const payment = await Payment.findOne({
         bookingId:booking._id
     })
@@ -131,15 +114,13 @@ export const refundPayment = asyncHandler(async (req: Request, res: Response) =>
     }
 
     // check if refund is already proceesed to prevent double refund
-
     const existingrefund = await Refund.findOne({
         paymentId:payment._id,
         status:{$in:["PENDING","PROCESSED"]}
     })
     if(existingrefund){
-        return res.status(200).json(new ApiResponse(200,existingrefund,"Refund already initiated"))
+        return existingrefund; // Refund already initiated or processed, return existing record
     }
-
     const refundRecord = await Refund.create({
         paymentId:payment._id,
         bookingId:booking._id,
@@ -148,32 +129,21 @@ export const refundPayment = asyncHandler(async (req: Request, res: Response) =>
         reason:"BOOKING_CANCELLED",
         status:"PENDING"
     })
+    try {
+        await refundQueue.add("process_refund",{
+            refundId:refundRecord._id,
+            paymentTransactionId:payment.transactionId,
+            amount:payment.amount
+        })
+    } catch (error) {
+        refundRecord.status="FAILED"
+        await refundRecord.save();
+        throw new ApiError(500,"Unable to initiate the refund. PLease try again")
+    }
+    return refundRecord;
 
-    const refundRazorpay = await razorpay.payments.refund(
-        payment.transactionId,
-        {
-            amount:payment.amount*100,
-            speed:"normal"
-        }
-    )
-    refundRecord.status = "PROCESSED";
-    refundRecord.refundTransactionId = refundRazorpay.id;
-    refundRecord.processedAt = new Date();
-
-    await refundRecord.save();
-    return res.status(200).json(
-        new ApiResponse(
-            200,
-            refundRecord,
-            "Refund processed successfully"
-        )
-        );
-
-})
+}
 // getPaymentDetails
 export const getPaymentDetails = asyncHandler(async (req: Request, res: Response) => { })
 // getPaymentHistory
 export const getPaymentHistory = asyncHandler(async (req: Request, res: Response) => { })
-
-// getAllPayements --> FOR ADMIN
-export const getAllPayements = asyncHandler(async (req: Request, res: Response) => { })

@@ -5,8 +5,6 @@ import slugify from "slugify";
 import { Event } from "../models/events.model";
 import { ApiResponse } from "../utils/apiResponse";
 
-
-
 export const createEvent = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     const { title, category, description, date, time, venueId, city } = req.body;
     const organizerId = req.user?.id;
@@ -150,7 +148,6 @@ export const getOrganizerEvents = asyncHandler(async (req: Request, res: Respons
         return res.status(200).json(new ApiResponse(200, [], "No Events found"))
     }
     const totalPages = Math.ceil(totalEvents / Number(limit));
-    // TODO : ADD REDIS CACHING HERE
     return res.status(200).json(new ApiResponse(200, { events, pagination: { totalPages, currentPage: Number(page), totalEvents, hasNextPage: Number(page) < totalPages } }, "Events fetched successfully"))
 })
 export const getEvents = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {

@@ -9,6 +9,7 @@ import { redis } from "../utils/redis";
 import { Seat } from "../models/seats.model";
 import mongoose from "mongoose";
 import { Show } from "../models/shows.model";
+import { initiateRefund } from "./payment.controller";
 
 export const createBooking = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     const { showId } = req.params;
@@ -74,66 +75,6 @@ export const createBooking = asyncHandler(async (req: Request, res: Response, ne
     );
 })
 
-export const confirmBooking = asyncHandler(async(job:any) => { 
-    const {bookingId,paymentId} = job.data;
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try{
-        // fetch booking
-        const booking = await Booking.findOne({bookingId}).session(session);
-        if(!booking){
-            throw new Error("Booking Not Found")
-        }
-        // check for if booking is already confirmed
-
-        if(booking.status === "CONFIRMED"){
-            return; // already processed
-        }
-        if(booking.status !== "PENDING"){
-            throw new Error("Invalid booking state");
-        }
-        // update db
-
-        const updateDB = await Seat.updateMany({
-            _id:{$in:booking.seatIds},
-            status:"AVAILABLE"
-        },{
-            $set:{
-                status:"BOOKED",
-                bookingId:booking._id
-            }
-        },{session})
-
-        if(updateDB.modifiedCount !== booking.seatIds.length){
-            throw new Error("Seat conflict detected")
-        }
-
-        booking.status = "CONFIRMED";
-        booking.paymentId = paymentId;
-
-        booking.qrCode = `QR-${booking.bookingId}-${Date.now()}`
-
-        await booking.save({session})
-
-        // clear redis locks
-
-        const lockKeys = booking.seatNumbers.map((seat)=>`seat:lock:${booking.showId}:${seat}`)
-
-        if(lockKeys.length > 0){
-            await redis.del(lockKeys)
-        }
-
-        await session.commitTransaction();
-        session.endSession();
-        console.log(`BOOKING CONFIRMED:${booking.bookingId}`)
-    }catch(error:any){
-        await session.abortTransaction();
-        session.endSession();
-        console.error("Booking confirmation failed",error.message)
-        throw error;// for bullmq to retry
-    }
-})
 // getBookingById
 export const getBookingById = asyncHandler(async (req: Request, res: Response) => {
     const {bookingId} = req.params;
@@ -246,8 +187,7 @@ export const cancelBookings = asyncHandler(async (req: Request, res: Response) =
         await session.commitTransaction();
         session.endSession()
 
-        //TODO: add refund processing to the queue
-
+        await initiateRefund(booking,userId.toString())
         return res.status(200).json(new ApiResponse(200,{},"Booking cancelled successfully,refund Initiated"))
     } catch (error:any) {
         session.abortTransaction();
