@@ -13,6 +13,7 @@ import venueRouter from "./routes/venues.routes";
 import { initSocket } from "./sockets";
 import seatRouter from "./routes/seats.routes";
 import bookingRouter from "./routes/booking.routes";
+import paymentRouter from "./routes/payment.routes";
 
 //Express alone != WebSocket server , socketIo need a http server instance
 const app: Application = express();
@@ -48,6 +49,7 @@ app.use("/api/v1/shows",showRouter)
 app.use("/api/v1/venues",venueRouter)
 app.use("/api/v1/seats",seatRouter)
 app.use("/api/v1/bookings",bookingRouter)
+app.use("/api/v1/payment",paymentRouter)
 connectDB()
   .then(() => {
     server.listen(PORT, () => {
