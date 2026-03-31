@@ -144,6 +144,8 @@ export const initiateRefund = async (booking:any,userId:string) => {
 
 }
 // getPaymentDetails
-export const getPaymentDetails = asyncHandler(async (req: Request, res: Response) => { })
+export const getPaymentDetails = asyncHandler(async (req: Request, res: Response) => {
+    
+})
 // getPaymentHistory
 export const getPaymentHistory = asyncHandler(async (req: Request, res: Response) => { })

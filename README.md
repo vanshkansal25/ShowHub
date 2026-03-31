@@ -13,6 +13,14 @@ A modern, robust backend platform for booking movies and events, inspired by Boo
   - Organizer capabilities to create, update, and manage events.
   - Partner functionalities to manage theaters (venues) and layout.
   - User filtering by category, city, date, and availability.
+- **Bookings & Real-Time Seats**:
+  - Secure, idempotent ticket bookings leveraging Redis locks for seat selection.
+  - Real-time concurrency handling using Socket.IO to prevent double-booking.
+- **Payments & Refunds**:
+  - Seamless Razorpay integration for creating order intents and cryptographically verifying payment signatures.
+  - Automated initiation of refunds upon valid ticket cancellations.
+- **Background Job Processing**:
+  - Reliable queue management utilizing BullMQ and Redis to execute deferred jobs (e.g., locking seats, processing refunds, verifying bookings) with built-in retry and exponential backoff mechanisms.
 
 ## Tech Stack
 
