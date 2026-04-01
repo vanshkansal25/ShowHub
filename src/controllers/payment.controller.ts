@@ -145,7 +145,69 @@ export const initiateRefund = async (booking:any,userId:string) => {
 }
 // getPaymentDetails
 export const getPaymentDetails = asyncHandler(async (req: Request, res: Response) => {
-    
+    const {bookingId} = req.params;
+    const userId = req.user?.id;
+    if(!bookingId){
+        throw new ApiError(400,"Booking Id is required")
+    }
+    if(!userId){
+        throw new ApiError(401,"Unauthorized")
+    }
+    const booking = await Booking.findById(bookingId).lean();
+    if(!booking){
+        throw new ApiError(404,"Booking Not Found");
+    }
+    if(booking.userId.toString() !== userId.toString()){
+        throw new ApiError(400,"Not allowed to access")
+    }
+    const payment = await Payment.findOne({
+        bookingId:booking._id
+    }).lean();
+
+    if(!payment){
+        throw new ApiError(404,"Payment Not Found")
+    }
+    const refund = await Refund.findOne({bookingId:booking._id}).lean();
+    return res.status(200).json(new ApiResponse(200,{
+        booking:{
+            bookingId:booking.bookingId,
+            status:booking.status,
+            totalAmount:booking.totalAmount
+        },
+        payment,
+        refund:refund || null,
+    },"Payment Details Fetched Successfully"))
 })
 // getPaymentHistory
-export const getPaymentHistory = asyncHandler(async (req: Request, res: Response) => { })
+export const getPaymentHistory = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if(!userId){
+        throw new ApiError(401,"Unauthorized")
+    }
+    const [bookings,totalBooking] = await Promise.all([
+        Booking.find({userId}).sort({createdAt:-1}).lean(),
+        Booking.countDocuments({userId})
+    ])
+
+    // early exit 
+    if(!bookings.length){
+        return res.status(200).json(new ApiResponse(200,{
+            payments:[],
+        },"No Payment History Found"))
+    }
+
+    const bookingIds = bookings.map((b)=>b._id)
+
+    const [payments,refund] = await Promise.all([
+        Payment.find({bookingId:{$in:bookingIds}}).lean(),
+        Refund.find({bookingId:{$in:bookingIds}}).lean()
+    ])
+
+    return res.status(200).json(new ApiResponse(200,{
+        totalBooking,
+        bookings,
+        payments,
+        refund,
+    },"Payment History Fetched Successfully"))
+
+})

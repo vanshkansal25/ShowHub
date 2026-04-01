@@ -195,16 +195,32 @@ export const cancelBookings = asyncHandler(async (req: Request, res: Response) =
         throw error;
     }
 })
-// validateQR
-export const validateQR = asyncHandler(async (req: Request, res: Response) => {
-
-})
 // getShowBookings
 export const getShowBookings = asyncHandler(async (req: Request, res: Response) => {
+    const {showId} = req.params;
+    if(!showId || !mongoose.Types.ObjectId.isValid(showId as string)){
+        throw new ApiError(400,"Invalid Show id")
+    }
+    const show = await Show.findById(showId).lean();
+    if(!show){
+        throw new ApiError(404,"Show Not Found");
+    }
+    const booking = await Booking.find({
+        showId
+    }).sort({createdAt:-1}).lean();
 
+    const confirmedBooking = booking.filter((b)=>b.status === "CONFIRMED")
+    const totalBookings = booking.length
+
+    const totalRevenue = confirmedBooking.reduce((sum,booking) => sum + booking.totalAmount,0)
+    const totalSeatsBooked = confirmedBooking.reduce((sum,booking) => sum + booking.seatNumbers.length,0)
+
+    return res.status(200).json(new ApiResponse(200,{
+        showId,
+        totalBookings,
+        confirmedBooking,
+        totalRevenue,
+        totalSeatsBooked,
+        booking
+    },"Show Bookings Fetched Successfully"))
 })
-// getEventBookings
-export const getEventBookings = asyncHandler(async (req: Request, res: Response) => {
-
-})
-
