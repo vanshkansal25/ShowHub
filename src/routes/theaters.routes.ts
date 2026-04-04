@@ -10,7 +10,7 @@ theaterRouter.get("/:theaterId", getTheaterDetails)
 theaterRouter.get("/", getAllTheaters)
 
 
-theaterRouter.post("/create", authMiddleware, authorizeRoles("THEATRE_PARTNER"), createTheater)
+theaterRouter.post("/create/:venueId", authMiddleware, authorizeRoles("THEATRE_PARTNER","ADMIN"), createTheater)
 theaterRouter.patch("/update/:theaterId", authMiddleware, authorizeRoles("THEATRE_PARTNER"), updateTheater)
 theaterRouter.delete("/delete/:theaterId", authMiddleware, authorizeRoles("THEATRE_PARTNER"), deleteTheater)
 theaterRouter.get("/partner", authMiddleware, authorizeRoles("THEATRE_PARTNER"), getPartnerTheaters)

@@ -10,8 +10,48 @@ import { Seat } from "../models/seats.model";
 import { getIO } from "../sockets";
 
 
+export const createSeatsForShow = asyncHandler(async (req: Request, res: Response) => {
+    const { showId } = req.params;
 
+    const show = await Show.findById(showId);
+    if (!show) throw new ApiError(404, "Show not found");
 
+    const theater = await Theater.findById(show.hallId);
+    if (!theater) throw new ApiError(404, "Theater not found");
+
+    const existingSeats = await Seat.findOne({ showId });
+    if (existingSeats) throw new ApiError(400, "Seats already generated");
+
+    const { rows, columns, gapSeat } = theater.seatingLayout;
+    const seatsToCreate = [];
+
+    // Map rows to pricing
+    for (let i = 0; i < rows.length; i++) {
+        const rowLabel = rows[i];
+        const tier = show.pricing[i] || show.pricing[show.pricing.length - 1];
+
+        for (let col = 1; col <= columns; col++) {
+            const seatNumber = `${rowLabel}-${col}`;
+            if (gapSeat.includes(seatNumber)) continue;
+
+            seatsToCreate.push({
+                showId: show._id,
+                theaterId: theater._id,
+                seatNumber,
+                tierName: tier.name,
+                price: tier.price,
+                status: 'AVAILABLE'
+            });
+        }
+    }
+
+    // Direct insert without session
+    const createdSeats = await Seat.insertMany(seatsToCreate);
+
+    return res.status(201).json(
+        new ApiResponse(201, { count: createdSeats.length }, "Seats generated successfully")
+    );
+});
 // how whole seat booking system work -> getSeatMap to get the snapshot of the seat map of available and booked seats this is just a snapshot not a realtime thing , i will handle real time thing using web sockets because if i make this controller realtime there will be heavy load on database
 // getSeatMap
 export const getSeatMap = asyncHandler(async (req: Request, res: Response) => {
@@ -126,25 +166,21 @@ export const lockSeats = asyncHandler(async (req: Request, res: Response) => {
         multi.call("SET",key, userId.toString(), "NX", "EX", 300); // --> NX here means it will only set the value if it NOT EXIST in redis making transaction atomic
     });
 
+    // multi.exec() will execute all the commands in multi and return an array of results-->[null,"OK"], if any command fails (like if a seat got locked by another user in between) then it will not execute any command and return null
+
     const results = await multi.exec();
+    const isSuccessful = results?.every((res) => res[1] === "OK");
 
-    // check all locks succeeded
-
-    const failedIndex = results?.findIndex((res) => res[1] === null);
-
-    if (failedIndex !== -1 || failedIndex !== undefined) {
-        // rollback (in case of any transaction fails)
+    if (!isSuccessful) {
         await Promise.all(lockKeys.map((key) => redis.del(key)));
-        throw new ApiError(
-            409,
-            "Seat could not be locked"
-        );
+        throw new ApiError(409, "One or more seats are already locked or could not be reserved");
     }
     // Flow --> User opens seat page, client emit "join_show" which will make them join same show room with a showId and when some lock the seat server emit a event of seat locking 
     io.to(showId).emit("seat_locked",{
         seatNumbers,
         userId
     })
+    console.log(`Seats ${seatNumbers} locked for show ${showId} by user ${userId}`);
 
     return res.status(200).json(
         new ApiResponse(200, { seatNumbers }, "Seats locked successfully")

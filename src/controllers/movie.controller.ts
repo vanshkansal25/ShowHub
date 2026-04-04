@@ -136,8 +136,9 @@ export const getAllMovies = asyncHandler(
             search,
             upcoming = "false",
         } = req.query;
-
-        const cacheKey = `movies:list:page=${page}:limit=${limit}:genre=${genre || "all"}:language=${language || "all"}:search=${search || "none"}:upcoming=${upcoming}`;
+        const normalizedGenre = genre?.toString().toLowerCase();
+        const normalizedLang = language?.toString().toLowerCase();// To prevent Redis cache fragmentation due to case sensitivity, so normalized genre and language to lowercase before using them in the cache key and database query.
+        const cacheKey = `movies:list:page=${page}:limit=${limit}:genre=${normalizedGenre || "all"}:language=${normalizedLang || "all"}:search=${search || "none"}:upcoming=${upcoming}`;
         const cachedData = await getCache(cacheKey);
         if(cachedData){
             return res.status(200).json(new ApiResponse(200, cachedData, "Movies fetched successfully (from cache)"));
