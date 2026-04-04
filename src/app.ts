@@ -1,4 +1,4 @@
-import express, { Application, Request, Response } from "express";
+import express, { Application, NextFunction, Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import "dotenv/config";
@@ -50,6 +50,24 @@ app.use("/api/v1/venues",venueRouter)
 app.use("/api/v1/seats",seatRouter)
 app.use("/api/v1/bookings",bookingRouter)
 app.use("/api/v1/payment",paymentRouter)
+
+
+// Global Error Handler
+interface HttpException extends Error {
+    status?: number;
+}
+app.use((err: HttpException, req: Request, res: Response, next: NextFunction) => {
+    const status = err.status || 500;
+    const message = err.message || 'Something went wrong';
+    if (process.env.NODE_ENV !== 'test') {
+        console.error(`[Error] Status: ${status}, Message: ${message}, Stack: ${err.stack}`);
+    }
+    res.status(status).json({
+        success: false,
+        status: status,
+        message: message,
+    });
+});
 connectDB()
   .then(() => {
     server.listen(PORT, () => {

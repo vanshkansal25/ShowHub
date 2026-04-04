@@ -18,7 +18,7 @@ export const createVenue = asyncHandler(async (req: Request, res: Response) => {
         throw new ApiError(400,"Fields are required to create new venue")
     }
     const normalizedName = name.trim().toLowerCase();
-    const normalizeCity = city.trime().toLowerCase();
+    const normalizeCity = city.trim().toLowerCase();
 
     const existingVenue = await Venue.findOne({
         name:new RegExp(`^${normalizedName}$`, "i"), //--> ^-startof string,$-endofstring , i->case insensitive

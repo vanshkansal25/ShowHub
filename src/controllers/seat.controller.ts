@@ -10,7 +10,7 @@ import { Seat } from "../models/seats.model";
 import { getIO } from "../sockets";
 
 
-const io = getIO();
+
 
 // how whole seat booking system work -> getSeatMap to get the snapshot of the seat map of available and booked seats this is just a snapshot not a realtime thing , i will handle real time thing using web sockets because if i make this controller realtime there will be heavy load on database
 // getSeatMap
@@ -90,6 +90,7 @@ export const getAvailableSeats = asyncHandler(async (req: Request, res: Response
 })
 // lockSeats  -- triggered via websocket
 export const lockSeats = asyncHandler(async (req: Request, res: Response) => {
+    const io = getIO();
     const { showId } = req.params;
     const {seatNumbers} = req.body;
     const userId = req.user?.id;
@@ -153,6 +154,7 @@ export const lockSeats = asyncHandler(async (req: Request, res: Response) => {
 // releaseSeats -- triggered via websocket
 export const releaseSeats = asyncHandler(async (req: Request, res: Response) => {
     // here i need to consider only the person who locks the seat can release it -- thats why i stored userId in redis with seat lock
+    const io = getIO();
     const { showId } = req.params;
     const {seatNumbers} = req.body;
     const userId = req.user?.id;
