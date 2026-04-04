@@ -43,5 +43,5 @@ const movieSchema = new Schema<IMovie>({
     Supports partial matches
     Supports multiple fields
  */
-movieSchema.index({ title: 'text', genre: 'text' });
+movieSchema.index({ title: 'text', genre: 'text' },{ language_override: 'search_language_ignore' });
 export const Movie = mongoose.model<IMovie>("Movie",movieSchema);

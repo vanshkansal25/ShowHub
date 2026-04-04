@@ -35,6 +35,7 @@ export const authMiddleware = asyncHandler(async(req: Request, res: Response, ne
 export const authorizeRoles = (...roles: ("CUSTOMER" | "ADMIN" | "THEATRE_PARTNER" | "EVENT_ORGANIZER")[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.user) {
+          console.log("User not found in request object");
             return next(new ApiError(401, "You are not logged in! Please log in to access this resource."));
         }
         if (!roles.includes(req.user.role)) {

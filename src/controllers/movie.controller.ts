@@ -32,6 +32,10 @@ export const addMovie = asyncHandler(
         ) {
             throw new ApiError(400, "All fields are required");
         }
+        const user = req.user;
+        if (!user || !["ADMIN"].includes(user.role)) {
+            throw new ApiError(403, "You are not authorized to add a movie");
+        }
         let slug = slugify(title, { lower: true, strict: true });
 
         // Ensure slug is unique

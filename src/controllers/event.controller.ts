@@ -4,6 +4,8 @@ import { ApiError } from "../utils/apiError";
 import slugify from "slugify";
 import { Event } from "../models/events.model";
 import { ApiResponse } from "../utils/apiResponse";
+import { Venue } from "../models/venues.model";
+
 
 export const createEvent = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     const { title, category, description, date, time, venueId, city } = req.body;
@@ -16,11 +18,15 @@ export const createEvent = asyncHandler(async (req: Request, res: Response, next
     }
     const slug = slugify(title, { lower: true, strict: true })
     // now check for duplicate events
+    const venue = await Venue.findById(venueId)
+    if(!venue){
+        throw new ApiError(400, "Venue not found")
+    }
 
     const existingEvent = await Event.findOne({
         slug,
         date,
-        venueId,
+        venueId: venue._id
     })
     if (existingEvent) {
         throw new ApiError(400, "Event already exists for this venue and date")
@@ -33,7 +39,7 @@ export const createEvent = asyncHandler(async (req: Request, res: Response, next
         description,
         date,
         time,
-        venueId,
+        venueId:venue._id,
         city,
         isSoldOut: false
     })
