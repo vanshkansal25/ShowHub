@@ -92,7 +92,6 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
         transactionId:paymentId,
         amount:booking.totalAmount
     })
-    // TODO :add confirmBooking to queue
     await bookingQueue.add("confirmBooking",{
         bookingId:booking.bookingId,
         paymentId:paymentId

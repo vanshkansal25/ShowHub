@@ -5,11 +5,11 @@ A modern, robust backend platform for booking movies and events, inspired by Boo
 ## Key Implemented Features
 
 - **Authentication & Authorization**: Secure JWT-based authentication with refresh token rotation and HTTP-only cookies. Role-based access control (Admin, Customer, Theatre Partner, Event Organizer).
-- **Movie Management**: 
+- **Movie Management**:
   - Admin functionalities for adding, updating, and soft-deleting movies.
   - User endpoints to browse movies by city, search with text-indexes, filter by upcoming/now-showing, and pagination.
   - Highly optimized queries utilizing MongoDB aggregation pipelines.
-- **Event & Theater Management**: 
+- **Event & Theater Management**:
   - Organizer capabilities to create, update, and manage events.
   - Partner functionalities to manage theaters (venues) and layout.
   - User filtering by category, city, date, and availability.
@@ -21,6 +21,7 @@ A modern, robust backend platform for booking movies and events, inspired by Boo
   - Automated initiation of refunds upon valid ticket cancellations.
 - **Background Job Processing**:
   - Reliable queue management utilizing BullMQ and Redis to execute deferred jobs (e.g., locking seats, processing refunds, verifying bookings) with built-in retry and exponential backoff mechanisms.
+- **Real-Time Communication**: Socket.IO for real-time seat updates.
 
 ## Tech Stack
 
@@ -33,15 +34,8 @@ A modern, robust backend platform for booking movies and events, inspired by Boo
 - **Real-time**: Socket.IO
 - **Message Queue**: BullMQ
 - **Payments**: Razorpay
-
-## Backend Architecture Overview
-
-ShowHub follows a scalable MVC (Model-View-Controller) architecture, separating business logic, routing, and database interactions:
-- **Routes**: Define API endpoints and apply relevant middleware.
-- **Controllers**: Handle core business logic, coordinate with models, and manage caching.
-- **Models**: Mongoose schemas defining data structure, relationships, and text indexes for search.
-- **Middleware**: Intercept requests for authentication, role validation, and error handling.
-- **Utils**: Reusable helpers like standardized API responses, API errors, and Redis cache managers.
+- **Validation**: Zod
+- **Containerization**: Docker Compose
 
 ## Folder Structure
 
@@ -52,8 +46,12 @@ src/
 ├── controllers/           # Business logic (Movies, Users, Events, etc.)
 ├── middlewares/           # Auth and role authorization guards
 ├── models/                # Mongoose schemas (Users, Movies, Events, Shows, etc.)
+├── queues/                # BullMQ queue configurations
 ├── routes/                # Express route definitions
-└── utils/                 # Utility functions (ApiError, ApiResponse, asyncHandler, redis)
+├── schemas/               # Zod validation schemas
+├── sockets/               # Socket.IO server setup
+├── utils/                 # Utility functions (ApiError, ApiResponse, asyncHandler, redis, razorpay)
+└── workers/               # Background job workers (booking, refund)
 ```
 
 ## API Overview
@@ -112,9 +110,10 @@ src/
 - `POST /create` - **(Admin, Event Organizer, Theatre Partner)** Create a new venue
 
 ### Seat Routes (`/api/v1/seats`)
+- `POST /:showId/create` - **(Theatre Partner, Admin)** Create seats for a specific show
 - `GET /:showId/seatmap` - Fetch the interactive seat map for a show
 - `GET /:showId/availableseats` - Fetch available seat IDs for a show
-- `POST /:showId` - **(Authenticated)** Lock or release seats for a show (Real-time updates via Socket.IO)
+- `POST /:showId` - **(Authenticated)** Lock or release seats for a show using Redis locks (Real-time updates via Socket.IO)
 
 ### Booking Routes (`/api/v1/booking`)
 - `POST /book/:showId` - **(Authenticated)** Create a new booking
@@ -125,11 +124,13 @@ src/
 ### Payment Routes (`/api/v1/payment`)
 - `POST /intent` - **(Authenticated)** Create a payment intent (Razorpay order)
 - `POST /verify` - **(Authenticated)** Verify a completed payment
+- `GET /Detail/:bookingId` - **(Authenticated)** Get payment details for a specific booking
+- `GET /History` - **(Authenticated)** Get payment history for the logged-in user
 
 ## Redis Usage
 
-Redis is actively utilized as a caching layer to reduce database load and improve response times for high-traffic movie discovery endpoints. 
-- Cached routes include: movie listings with applied filters, city-based queries, individual slug lookups, text searches, and "coming soon" / "now showing" feeds. 
+Redis is actively utilized as a caching layer to reduce database load and improve response times for high-traffic movie discovery endpoints.
+- Cached routes include: movie listings with applied filters, city-based queries, individual slug lookups, text searches, and "coming soon" / "now showing" feeds.
 - TTL (Time-To-Live) is strategically set varying from 30 minutes to 6 hours depending on the volatility of the data.
 
 ## Error Handling and Middleware Design
@@ -154,8 +155,6 @@ Background processing is decoupled using **BullMQ** to ensure main API threads r
 - **Booking Worker**: Handles the final confirmation of seat bookings asynchronously. Once a payment is verified, the worker executes a distributed MongoDB transaction to secure the allocated seats, issue a QR-Code, clear Redis seat locks, and mark the booking as confirmed.
 - **Refund Worker**: In cases of strict cancellations, communicates with the Razorpay API to process user refunds automatically. Incorporates exponential backoff and localized retry policies in case of external gateway downtime.
 
-## Current Project Status
+## Real-Time Features with Socket.IO
 
-**Work in Progress (Active Development)**
-- **Completed**: User authentication flow, Role-Based Access Control, Movie/Event catalogue management, Theater/Venue management APIs, Show & Seat management with Socket.IO updates, Bookings, Payment gateway integrations (Razorpay) and Refunds,Queue-based job processing (BullMQ refunds & booking confirmations).
-- **Pending/WIP**: Waitlist flows, and QR Code generation for tickets.
+Socket.IO enables real-time communication for seat selection and booking updates, preventing race conditions and providing instant feedback to users. The server setup is in `sockets/index.ts`.
